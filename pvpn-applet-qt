@@ -11,8 +11,7 @@ from PyQt5.QtGui import QIcon
 
 
 def check_single_instance():
-    pid = subprocess.check_output("pgrep pvpn-applet-qt".split()).decode(sys.stdout.encoding)
-    print(pid)
+    pid = subprocess.check_output("pgrep pvpn-applet".split()).decode(sys.stdout.encoding)
     try:
         pid.split()[1]
         print("There is an instance already running")
@@ -31,10 +30,8 @@ class Polling(QThread):
 
     def run(self):
         while(True):
-            result = subprocess.check_output("sudo pvpn --status".split()).decode(sys.stdout.encoding)
-            result = result.split('\n')
             try:
-                result[4].split(':')[1]
+                subprocess.check_output("pgrep openvpn".split()).decode(sys.stdout.encoding)
                 self.PApplet.tray_icon.setIcon(QIcon("icons/16x16/protonvpn-connected.png"))
             except Exception:
                 self.PApplet.tray_icon.setIcon(QIcon("icons/16x16/protonvpn-disconnected.png"))
