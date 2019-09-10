@@ -1,19 +1,97 @@
 #!/usr/bin/python
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QGridLayout, QWidget, QCheckBox, QSystemTrayIcon, \
-    QSpacerItem, QSizePolicy, QMenu, QAction, qApp
-from PyQt5.QtCore import QSize
-from PyQt5.QtGui import QIcon
-import subprocess
-from gi.repository import Notify
 import sys
+import subprocess
+import gi
+gi.require_version('Notify', '0.7')
+from gi.repository import Notify
+
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QSystemTrayIcon, QMenu, QAction, qApp
+from PyQt5.QtCore import QSize, QThread
+from PyQt5.QtGui import QIcon
 
 
-class MainWindow(QMainWindow):
-    """
-         Сheckbox and system tray icons.
-         Will initialize in the constructor.
-    """
-    check_box = None
+def check_single_instance():
+    pid = subprocess.check_output("pgrep pvpn-applet-qt".split()).decode(sys.stdout.encoding)
+    print(pid)
+    try:
+        pid.split()[1]
+        print("There is an instance already running")
+        exit()
+    except Exception:
+        pass
+
+
+class Polling(QThread):
+    def __init__(self, PApplet):
+        QThread.__init__(self)
+        self.PApplet = PApplet
+
+    def __del__(self):
+        self.wait()
+
+    def run(self):
+        while(True):
+            result = subprocess.check_output("sudo pvpn --status".split()).decode(sys.stdout.encoding)
+            result = result.split('\n')
+            try:
+                result[4].split(':')[1]
+                self.PApplet.tray_icon.setIcon(QIcon("icons/16x16/protonvpn-connected.png"))
+            except Exception:
+                self.PApplet.tray_icon.setIcon(QIcon("icons/16x16/protonvpn-disconnected.png"))
+            self.sleep(1)
+
+
+class ConnectVPN(QThread):
+    def __init__(self, PApplet):
+        QThread.__init__(self)
+        self.PApplet = PApplet
+
+    def __del__(self):
+        self.wait()
+
+    def run(self):
+        try:
+            subprocess.run("sudo pvpn -l".split())
+        except Exception:
+            subprocess.run("sudo pvpn -f".split())
+        self.PApplet.status_vpn("dummy")
+
+
+class DisconnectVPN(QThread):
+    def __init__(self, PApplet):
+        QThread.__init__(self)
+        self.PApplet = PApplet
+
+    def __del__(self):
+        self.wait()
+
+    def run(self):
+        subprocess.run("sudo pvpn -d".split())
+        self.PApplet.status_vpn("dummy")
+
+
+class CheckStatus(QThread):
+    def __init__(self, PApplet):
+        QThread.__init__(self)
+        self.PApplet = PApplet
+
+    def __del__(self):
+        self.wait()
+
+    def run(self):
+        result = subprocess.check_output("sudo pvpn --status".split()).decode(sys.stdout.encoding)
+        result = result.split('\n')
+        try:
+            server = result[4].split(':')[1]
+            ip = result[3].split(':')[1]
+            Notify.Notification.new(f"VPN Connected\nServer: {server}\nIP address: {ip}").show()
+            self.PApplet.tray_icon.setIcon(QIcon("icons/16x16/protonvpn-connected.png"))
+        except Exception:
+            Notify.Notification.new(f"VPN disconnected").show()
+            self.PApplet.tray_icon.setIcon(QIcon("icons/16x16/protonvpn-disconnected.png"))
+
+
+class PVPNApplet(QMainWindow):
     tray_icon = None
 
     # Override the class constructor
@@ -26,38 +104,20 @@ class MainWindow(QMainWindow):
         central_widget = QWidget(self)                  # Create a central widget
         self.setCentralWidget(central_widget)           # Set the central widget
 
-        grid_layout = QGridLayout(self)         # Create a QGridLayout
-        central_widget.setLayout(grid_layout)   # Set the layout into the central widget
-        grid_layout.addWidget(QLabel("Application, which can minimize to Tray", self), 0, 0)
-
-        # Add a checkbox, which will depend on the behavior of the program when the window is closed
-        self.check_box = QCheckBox('Minimize to Tray')
-        grid_layout.addWidget(self.check_box, 1, 0)
-        grid_layout.addItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Expanding), 2, 0)
-
         # Init QSystemTrayIcon
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_icon.setIcon(QIcon("icons/16x16/protonvpn-disconnected.png"))
 
+        # Init libnotify
         Notify.init("ProtonVPN")
 
-        '''
-            Define and add steps to work with the system tray icon
-            show - show window
-            hide - hide window
-            exit - exit from application
-        '''
         # Menu actions
         connect_action = QAction("Connect", self)
         disconnect_action = QAction("Disconnect", self)
         status_action = QAction("Status", self)
-        show_action = QAction("Show", self)
         quit_action = QAction("Exit", self)
-        hide_action = QAction("Hide", self)
 
         # Triggers
-        show_action.triggered.connect(self.show)
-        hide_action.triggered.connect(self.hide)
         quit_action.triggered.connect(qApp.quit)
         connect_action.triggered.connect(self.connect_vpn)
         disconnect_action.triggered.connect(self.disconnect_vpn)
@@ -68,46 +128,41 @@ class MainWindow(QMainWindow):
         tray_menu.addAction(connect_action)
         tray_menu.addAction(disconnect_action)
         tray_menu.addAction(status_action)
-        tray_menu.addAction(show_action)
-        tray_menu.addAction(hide_action)
         tray_menu.addAction(quit_action)
         self.tray_icon.setContextMenu(tray_menu)
         self.tray_icon.show()
 
+        # Polling thread
+        self.pollingThread = Polling(self)
+        self.pollingThread.start()
+
     def connect_vpn(self, event):
-        subprocess.run("sudo protonvpn-cli -l".split())
-        self.status_vpn(event)
+        self.connectThread = ConnectVPN(self)
+        self.connectThread.start()
 
     def disconnect_vpn(self, event):
-        subprocess.run("sudo protonvpn-cli -d".split(), stdout=subprocess.PIPE)
-        self.status_vpn(event)
+        self.disconnectThread = DisconnectVPN(self)
+        self.disconnectThread.start()
 
     def status_vpn(self, event):
-        result = subprocess.check_output("sudo protonvpn-cli --status".split()).decode(sys.stdout.encoding)
-        result = result.split('\n')
-        try:
-            server = result[4].split(':')[1]
-            ip = result[3].split(':')[1]
-            Notify.Notification.new(f"VPN Connected\nServer: {server}\nIP address: {ip}").show()
-            self.tray_icon.setIcon(QIcon("icons/16x16/protonvpn-connected.png"))
-        except Exception:
-            Notify.Notification.new(f"VPN disconnected").show()
-            self.tray_icon.setIcon(QIcon("icons/16x16/protonvpn-disconnected.png"))
+        self.statusThread = CheckStatus(self)
+        self.statusThread.start()
 
-    # Override closeEvent, to intercept the window closing event
-    # The window will be closed only if there is no check mark in the check box
+    # Override closeEvent to intercept the window closing event
     def closeEvent(self, event):
         event.ignore()
         self.hide()
-        # self.tray_icon.showMessage(
-        #     "Tray Program",
-        #     "Application was minimized to Tray",
-        #     QSystemTrayIcon.Information,
-        #     2000
-        # )
+
+    # Override Quit to kill the polling thread
+    # TODO doesn't override anything
+    # def Quit(self):
+    #     print("Exiting")
+    #     self.pollingThread.terminate()
+    #     qApp.quit()
 
 
 if __name__ == "__main__":
+    check_single_instance()
     app = QApplication(sys.argv)
-    mw = MainWindow()
+    mw = PVPNApplet()
     sys.exit(app.exec())
