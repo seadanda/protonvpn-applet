@@ -11,7 +11,11 @@ from PyQt5.QtGui import QIcon
 
 
 def check_single_instance():
-    pid = subprocess.check_output("pgrep pvpn-applet".split()).decode(sys.stdout.encoding)
+    try:
+        pid = subprocess.check_output("pgrep pvpn-applet".split()).decode(sys.stdout.encoding)
+    except Exception:
+        pid = subprocess.check_output("pgrep pvpn-applet.py".split()).decode(sys.stdout.encoding)
+
     try:
         pid.split()[1]
         print("There is an instance already running")
