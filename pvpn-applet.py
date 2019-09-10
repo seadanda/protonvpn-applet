@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import sys
+import re
 import subprocess
 import gi
 gi.require_version('Notify', '0.7')
@@ -33,10 +34,14 @@ class Polling(QThread):
         self.wait()
 
     def run(self):
-        while(True):
+        while(self.PApplet.is_polling()):
             try:
                 subprocess.check_output("pgrep openvpn".split()).decode(sys.stdout.encoding)
-                self.PApplet.tray_icon.setIcon(QIcon("icons/16x16/protonvpn-connected.png"))
+                iplink = subprocess.check_output("ip link".split()).decode(sys.stdout.encoding)
+                if (re.search(r'tun[0-9]:', iplink)):
+                    self.PApplet.tray_icon.setIcon(QIcon("icons/16x16/protonvpn-connected.png"))
+                else:
+                    raise Exception
             except Exception:
                 self.PApplet.tray_icon.setIcon(QIcon("icons/16x16/protonvpn-disconnected.png"))
             self.sleep(1)
@@ -94,6 +99,7 @@ class CheckStatus(QThread):
 
 class PVPNApplet(QMainWindow):
     tray_icon = None
+    polling = True
 
     # Override the class constructor
     def __init__(self):
@@ -134,11 +140,23 @@ class PVPNApplet(QMainWindow):
         self.tray_icon.show()
 
         # Polling thread
+        self.start_polling()
+
+    def is_polling(self):
+        return self.polling
+
+    def kill_polling(self):
+        self.polling = False
+
+    def start_polling(self):
+        self.polling = True
         self.pollingThread = Polling(self)
         self.pollingThread.start()
 
     def connect_vpn(self, event):
+        self.kill_polling()
         self.connectThread = ConnectVPN(self)
+        self.connectThread.finished.connect(self.start_polling)
         self.connectThread.start()
 
     def disconnect_vpn(self, event):
@@ -153,13 +171,6 @@ class PVPNApplet(QMainWindow):
     def closeEvent(self, event):
         event.ignore()
         self.hide()
-
-    # Override Quit to kill the polling thread
-    # TODO doesn't override anything
-    # def Quit(self):
-    #     print("Exiting")
-    #     self.pollingThread.terminate()
-    #     qApp.quit()
 
 
 if __name__ == "__main__":
