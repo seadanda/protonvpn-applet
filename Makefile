@@ -14,7 +14,7 @@ pvpn-applet: pvpn-applet.py
 	sed "s@icons/16x16@$(DESTDIR)$(ICONDIR)@g" pvpn-applet.py > pvpn-applet
 	chmod +x pvpn-applet
 
-install: pvpn-applet
+install: options pvpn-applet
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
 	cp -f pvpn-applet $(DESTDIR)$(PREFIX)/bin
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/pvpn-applet
