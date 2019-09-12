@@ -13,9 +13,9 @@ from PyQt5.QtGui import QIcon
 
 def check_single_instance():
     try:
-        pid = subprocess.check_output("pgrep pvpn-applet".split()).decode(sys.stdout.encoding)
+        pid = subprocess.check_output("pgrep protonvpn-applet".split()).decode(sys.stdout.encoding)
     except Exception:
-        pid = subprocess.check_output("pgrep pvpn-applet.py".split()).decode(sys.stdout.encoding)
+        pid = subprocess.check_output("pgrep protonvpn-applet.py".split()).decode(sys.stdout.encoding)
 
     try:
         pid.split()[1]
@@ -57,9 +57,9 @@ class ConnectVPN(QThread):
 
     def run(self):
         try:
-            subprocess.run("sudo pvpn -l".split())
+            subprocess.run("sudo protonvpn -l".split())
         except Exception:
-            subprocess.run("sudo pvpn -f".split())
+            subprocess.run("sudo protonvpn -f".split())
         self.PApplet.status_vpn("dummy")
 
 
@@ -72,7 +72,7 @@ class DisconnectVPN(QThread):
         self.wait()
 
     def run(self):
-        subprocess.run("sudo pvpn -d".split())
+        subprocess.run("sudo protonvpn -d".split())
         self.PApplet.status_vpn("dummy")
 
 
@@ -85,7 +85,7 @@ class CheckStatus(QThread):
         self.wait()
 
     def run(self):
-        result = subprocess.check_output("sudo pvpn --status".split()).decode(sys.stdout.encoding)
+        result = subprocess.check_output("sudo protonvpn --status".split()).decode(sys.stdout.encoding)
         result = result.split('\n')
         try:
             server = result[4].split(':')[1]
