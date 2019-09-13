@@ -3,6 +3,15 @@ Basic systray applet for ProtonVPN written in python + PyQt5 with protonvpn-cli 
 
 I like systray icons and nothing existed for ProtonVPN so I made one. Warning: low effort content.
 
+## Dependencies
+- python3
+- libnotify
+- sudo (with [passwordless sudo](https://wiki.archlinux.org/index.php/Sudo#Example_entries))
+- protonvpn-cli
+Python packages:
+- pyqt5
+- gobject-introspection
+
 ## Running
 It is possible to clone the repo and just run straight away with
 ```
