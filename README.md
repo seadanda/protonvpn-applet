@@ -8,6 +8,7 @@ I like systray icons and nothing existed for ProtonVPN so I made one. Warning: l
 - libnotify
 - sudo (with [passwordless sudo](https://wiki.archlinux.org/index.php/Sudo#Example_entries))
 - protonvpn-cli
+
 Python packages:
 - pyqt5
 - gobject-introspection
@@ -17,7 +18,7 @@ It is possible to clone the repo and just run straight away with
 ```
 ./protonvpn-applet.py
 ```
-You might have to `chmod +x protonvpn-applet` first
+You might have to `chmod +x protonvpn-applet.py` first
 
 ## Installing
 ### From source
