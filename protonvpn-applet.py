@@ -60,9 +60,9 @@ class ConnectVPN(QThread):
 
     def run(self):
         try:
-            subprocess.run("sudo protonvpn -l".split())
+            subprocess.run("sudo protonvpn-cli -l".split())
         except Exception:
-            subprocess.run("sudo protonvpn -f".split())
+            subprocess.run("sudo protonvpn-cli -f".split())
         self.PApplet.status_vpn("dummy")
 
 
@@ -75,7 +75,7 @@ class DisconnectVPN(QThread):
         self.wait()
 
     def run(self):
-        subprocess.run("sudo protonvpn -d".split())
+        subprocess.run("sudo protonvpn-cli -d".split())
         self.PApplet.status_vpn("dummy")
 
 
@@ -88,7 +88,7 @@ class CheckStatus(QThread):
         self.wait()
 
     def run(self):
-        result = subprocess.check_output("sudo protonvpn --status".split()).decode(sys.stdout.encoding)
+        result = subprocess.check_output("sudo protonvpn-cli --status".split()).decode(sys.stdout.encoding)
         result = result.split('\n')
         try:
             server = result[4].split(':')[1]
