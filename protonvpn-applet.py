@@ -15,7 +15,10 @@ def check_single_instance():
     try:
         pid = subprocess.check_output("pgrep protonvpn-applet".split()).decode(sys.stdout.encoding)
     except Exception:
-        pid = subprocess.check_output("pgrep protonvpn-applet.py".split()).decode(sys.stdout.encoding)
+        try:
+            pid = subprocess.check_output("pgrep protonvpn-applet.py".split()).decode(sys.stdout.encoding)
+        except Exception:
+            pass
 
     try:
         pid.split()[1]
