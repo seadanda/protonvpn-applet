@@ -1,0 +1,3 @@
+pre-commit
+pyqt5
+gobject-introspection
