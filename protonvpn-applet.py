@@ -23,6 +23,9 @@ class VPNCommand(Enum):
 
 
 def check_single_instance():
+
+    pid = None
+
     try:
         pid = subprocess.check_output('pgrep protonvpn-applet'.split()).decode(sys.stdout.encoding)
     except subprocess.CalledProcessError:
@@ -31,7 +34,7 @@ def check_single_instance():
         except subprocess.CalledProcessError:
             pass
 
-    if len(pid.split()) > 1:
+    if pid is not None:
         print('There is an instance already running.')
         sys.exit(1)
 
