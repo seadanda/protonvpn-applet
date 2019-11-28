@@ -17,9 +17,9 @@ class VPNStatusException(Exception):
 
 
 class VPNCommand(Enum):
-    status = 'sudo protonvpn s'
-    connect_fastest = 'sudo protonvpn c -f'
-    disconnect = 'sudo protonvpn d'
+    status = 'protonvpn s'
+    connect_fastest = 'protonvpn c -f'
+    disconnect = 'protonvpn d'
 
 
 def check_single_instance():
@@ -112,11 +112,15 @@ class CheckStatus(QThread):
         result = subprocess.check_output(VPNCommand.status.value.split()).decode(sys.stdout.encoding)
         result = result.split('\n')
 
+        print(result)
+
         if 'Disconnected' in result[0]:
-            Notify.Notification.new(f'VPN disconnected').show()
+            if self.PApplet.show_notifications():
+                Notify.Notification.new(f'VPN disconnected').show()
             self.PApplet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-disconnected.png'))
         elif 'Connected' in result[0]:
-            Notify.Notification.new('\n'.join(result)).show()
+            if self.PApplet.show_notifications():
+                Notify.Notification.new('\n'.join(result)).show()
             self.PApplet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-connected.png'))
         else:
             raise VPNStatusException(f'VPN status could not be parsed: {result}')

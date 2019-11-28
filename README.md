@@ -21,15 +21,6 @@ It is possible to clone the repo and just run straight away with
 ```
 You might have to `chmod +x protonvpn-applet.py` first.
 
-By default, `protonvpn` requires superuser permissions, and therefore `protonvpn-applet` requires them too. If you'd
-like to avoid running with elevated permissions every time you launch the applet (for example when running at system
-startup), and you don't mind living dangerously, run the following as `root`:
-
-```bash
-chmod root:root protonvpn-applet.py  # Change ownership to root
-chmod u+s protonvpn-applet.py  # Set the setuid bit.
-```
-
 
 ## Installing
 ### From source
