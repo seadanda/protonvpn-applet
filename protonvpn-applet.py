@@ -17,9 +17,9 @@ class VPNStatusException(Exception):
 
 
 class VPNCommand(Enum):
-    status = 'protonvpn s'
-    connect_fastest = 'protonvpn c -f'
-    disconnect = 'protonvpn d'
+    status = 'sudo protonvpn s'
+    connect_fastest = 'sudo protonvpn c -f'
+    disconnect = 'sudo protonvpn d'
 
 
 def check_single_instance():

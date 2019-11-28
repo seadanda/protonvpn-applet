@@ -1,5 +1,5 @@
 [flake8]
 builtins = _
-ignore = E402
+ignore = E402,E501
 exclude = .git,__pycache__,.pytest_cache,.vscode
 max-line-length = 120
