@@ -7,9 +7,12 @@ import gi
 gi.require_version('Notify', '0.7')
 from gi.repository import Notify
 
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QSystemTrayIcon, QMenu, QAction, qApp
-from PyQt5.QtCore import QSize, QThread
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QSystemTrayIcon, QMenu, QAction, qApp, QMessageBox
+from PyQt5.QtCore import QSize, QThread, pyqtSignal
 from PyQt5.QtGui import QIcon
+
+
+PROTONVPN_APPLET_VERSION = 0.1
 
 
 class VPNStatusException(Exception):
@@ -20,6 +23,7 @@ class VPNCommand(Enum):
     status = 'sudo protonvpn s'
     connect_fastest = 'sudo protonvpn c -f'
     disconnect = 'sudo protonvpn d'
+    version = 'sudo protonvpn -v'
 
 
 def check_single_instance():
@@ -128,7 +132,27 @@ class CheckStatus(QThread):
         return
 
 
+class CheckProtonVPNVersion(QThread):
+
+    protonvpn_version_ready = pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.parent = parent
+        self.version = 'None'
+
+    def __del__(self):
+        self.wait()
+        return
+
+    def run(self):
+        self.version = subprocess.check_output(VPNCommand.version.value.split()).decode(sys.stdout.encoding)
+        self.protonvpn_version_ready.emit(self.version)
+        return
+
+
 class PVPNApplet(QMainWindow):
+
     tray_icon = None
     polling = True
 
@@ -154,6 +178,8 @@ class PVPNApplet(QMainWindow):
         disconnect_action = QAction('Disconnect', self)
         status_action = QAction('Status', self)
         quit_action = QAction('Exit', self)
+        show_protonvpn_applet_version_action = QAction('About ProtonVPN-Applet', self)
+        show_protonvpn_version_action = QAction('About ProtonVPN', self)
         self.show_notifications_action = QAction('Show Notifications')
         self.show_notifications_action.setCheckable(True)
         self.show_notifications_action.setChecked(False)
@@ -163,13 +189,17 @@ class PVPNApplet(QMainWindow):
         connect_action.triggered.connect(self.connect_vpn)
         disconnect_action.triggered.connect(self.disconnect_vpn)
         status_action.triggered.connect(self.status_vpn)
+        show_protonvpn_applet_version_action.triggered.connect(self.show_protonvpn_applet_version)
+        show_protonvpn_version_action.triggered.connect(self.get_protonvpn_version)
 
         # Draw menu
         tray_menu = QMenu()
+        tray_menu.addAction(show_protonvpn_applet_version_action)
+        tray_menu.addAction(show_protonvpn_version_action)
+        tray_menu.addAction(self.show_notifications_action)
         tray_menu.addAction(connect_action)
         tray_menu.addAction(disconnect_action)
         tray_menu.addAction(status_action)
-        tray_menu.addAction(self.show_notifications_action)
         tray_menu.addAction(quit_action)
         self.tray_icon.setContextMenu(tray_menu)
         self.tray_icon.show()
@@ -217,6 +247,46 @@ class PVPNApplet(QMainWindow):
 
     def show_notifications(self):
         return self.show_notifications_action.isChecked()
+
+    def show_protonvpn_applet_version(self):
+        """Show the protonvpn-applet version.
+        """
+
+        name = '© 2019 Dónal Murray'
+        email = 'dmurray654@gmail.com'
+        github = 'https://github.com/seadanda/protonvpn-applet'
+
+        info = [f'<center>Version: {PROTONVPN_APPLET_VERSION}',
+                f'{name}',
+                f"<a href='{email}'>{email}</a>",
+                f"<a href='{github}'>{github}</a></center>"]
+
+        centered_text = f'<center>{"<br>".join(info)}</center>'
+
+        QMessageBox.information(self, 'protonvpn-applet', centered_text)
+
+        return
+
+    def get_protonvpn_version(self):
+        """Start the CheckProtonVPNVersion thread; when it gets the version, it will call `self.show_protonvpn_version`
+        """
+        print('called get_protonvpn_version')
+        self.check_protonvpn_version_thread = CheckProtonVPNVersion(self)
+        self.check_protonvpn_version_thread.protonvpn_version_ready.connect(self.show_protonvpn_version)
+        self.check_protonvpn_version_thread.start()
+        return
+
+    def show_protonvpn_version(self, version):
+        """Show the ProtonVPN version in a QMessageBox.
+
+        Parameters
+        ----------
+        version : str
+            Version number to be shown.
+        """
+        print('called show_protonvpn_version')
+        QMessageBox.information(self, 'ProtonVPN Version', f'Version: {version}')
+        return
 
 
 if __name__ == '__main__':
