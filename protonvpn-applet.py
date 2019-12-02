@@ -2,6 +2,7 @@
 import sys
 import re
 import subprocess
+import functools
 from enum import Enum
 import gi
 gi.require_version('Notify', '0.7')
@@ -10,6 +11,8 @@ from gi.repository import Notify
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QSystemTrayIcon, QMenu, QAction, qApp
 from PyQt5.QtCore import QSize, QThread
 from PyQt5.QtGui import QIcon
+
+from protonvpn_cli import utils, country_codes
 
 
 class VPNStatusException(Exception):
@@ -20,6 +23,12 @@ class VPNCommand(Enum):
     status = 'sudo protonvpn s'
     connect_fastest = 'sudo protonvpn c -f'
     disconnect = 'sudo protonvpn d'
+    connect_random = 'sudo protonvpn c -r'
+    connect_fastest_cc = 'sudo protonvpn c --cc'
+    connect_fastest_p2p = 'sudo protonvpn c --p2p'
+    connect_fastest_sc = 'sudo protonvpn c --sc'
+    connect_fastest_tor = 'sudo protonvpn c --tor'
+    reconnect = 'sudo protonvpn r'
 
 
 def check_single_instance():
@@ -59,7 +68,7 @@ class Polling(QThread):
                 if (re.search(r'tun[0-9]:', iplink)):
                     self.PApplet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-connected.png'))
                 else:
-                    raise VPNStatusException('Cannot parse `ip link` output.')
+                    pass  # Sometimes ip link doesn't update immediately. Check again at next poll
             except subprocess.CalledProcessError:
                 self.PApplet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-disconnected.png'))
             self.sleep(1)
@@ -67,9 +76,10 @@ class Polling(QThread):
 
 
 class ConnectVPN(QThread):
-    def __init__(self, PApplet):
+    def __init__(self, PApplet, command):
         QThread.__init__(self)
         self.PApplet = PApplet
+        self.command = command
         return
 
     def __del__(self):
@@ -77,7 +87,7 @@ class ConnectVPN(QThread):
         return
 
     def run(self):
-        subprocess.run(VPNCommand.connect_fastest.value.split())
+        subprocess.run(self.command.split())
         self.PApplet.status_vpn('dummy')
         return
 
@@ -98,6 +108,22 @@ class DisconnectVPN(QThread):
         return
 
 
+class ReconnectVPN(QThread):
+    def __init__(self, PApplet):
+        QThread.__init__(self)
+        self.PApplet = PApplet
+        return
+
+    def __del__(self):
+        self.wait()
+        return
+
+    def run(self):
+        subprocess.run(VPNCommand.reconnect.value.split())
+        self.PApplet.status_vpn('dummy')
+        return
+
+
 class CheckStatus(QThread):
     def __init__(self, PApplet):
         QThread.__init__(self)
@@ -111,8 +137,6 @@ class CheckStatus(QThread):
     def run(self):
         result = subprocess.check_output(VPNCommand.status.value.split()).decode(sys.stdout.encoding)
         result = result.split('\n')
-
-        print(result)
 
         if 'Disconnected' in result[0]:
             if self.PApplet.show_notifications():
@@ -141,6 +165,7 @@ class PVPNApplet(QMainWindow):
         self.setWindowTitle('ProtonVPN Qt')             # Set a title
         central_widget = QWidget(self)                  # Create a central widget
         self.setCentralWidget(central_widget)           # Set the central widget
+        self.country_codes = country_codes              # Keep a list of country codes
 
         # Init QSystemTrayIcon
         self.tray_icon = QSystemTrayIcon(self)
@@ -149,25 +174,69 @@ class PVPNApplet(QMainWindow):
         # Init libnotify
         Notify.init('ProtonVPN')
 
+        # Refresh server list, store the resulting servers so we can populate the menu
+        self.servers = self.update_available_servers()
+
         # Menu actions
-        connect_action = QAction('Connect', self)
+        connect_fastest_action = QAction('Connect', self)
         disconnect_action = QAction('Disconnect', self)
         status_action = QAction('Status', self)
         quit_action = QAction('Exit', self)
+        connect_fastest_sc_action = QAction('Secure Core', self)
+        connect_fastest_p2p_action = QAction('P2P', self)
+        connect_fastest_tor_action = QAction('Tor', self)
+        connect_random_action = QAction('Random', self)
+        reconnect_action = QAction('Reconnect', self)
         self.show_notifications_action = QAction('Show Notifications')
         self.show_notifications_action.setCheckable(True)
         self.show_notifications_action.setChecked(False)
 
         # Triggers
         quit_action.triggered.connect(qApp.quit)
-        connect_action.triggered.connect(self.connect_vpn)
+        connect_fastest_action.triggered.connect(self.connect_fastest)
         disconnect_action.triggered.connect(self.disconnect_vpn)
         status_action.triggered.connect(self.status_vpn)
+        connect_fastest_sc_action.triggered.connect(self.connect_fastest_sc)
+        connect_fastest_p2p_action.triggered.connect(self.connect_fastest_p2p)
+        connect_fastest_tor_action.triggered.connect(self.connect_fastest_tor)
+        connect_random_action.triggered.connect(self.connect_random)
+        reconnect_action.triggered.connect(self.reconnect_vpn)
+
+        # Generate connection menu for specific countries
+        connect_country_actions = []
+        for country_name in self.get_available_countries(self.servers):
+
+            # Get the ISO-3166 Alpha-2 country code
+            country_code = country_codes.country_codes['name_to_cc'][country_name]
+
+            # Dynamically create functions for connecting to each country; each function just passes its respective
+            # country code to `self.connect_fastest_cc()`
+            setattr(self, f'connect_fastest_{country_code}', functools.partial(self.connect_fastest_cc, country_code))
+
+            # Generate an action for each country; set up the trigger; append to actions list
+            country_action = QAction(f'{country_name}', self)
+            country_action.triggered.connect(getattr(self, f'connect_fastest_{country_code}'))
+            connect_country_actions.append(country_action)
+
+        # Create a scrollable country connection menu
+        connect_country_menu = QMenu("Country...", self)
+        connect_country_menu.setStyleSheet('QMenu  { menu-scrollable: 1; }')
+        connect_country_menu.addActions(connect_country_actions)
+
+        # Generate connection menu
+        connection_menu = QMenu("Other connections...", self)
+        connection_menu.addMenu(connect_country_menu)
+        connection_menu.addAction(connect_fastest_sc_action)
+        connection_menu.addAction(connect_fastest_p2p_action)
+        connection_menu.addAction(connect_fastest_tor_action)
+        connection_menu.addAction(connect_random_action)
 
         # Draw menu
         tray_menu = QMenu()
-        tray_menu.addAction(connect_action)
+        tray_menu.addMenu(connection_menu)
+        tray_menu.addAction(connect_fastest_action)
         tray_menu.addAction(disconnect_action)
+        tray_menu.addAction(reconnect_action)
         tray_menu.addAction(status_action)
         tray_menu.addAction(self.show_notifications_action)
         tray_menu.addAction(quit_action)
@@ -192,11 +261,36 @@ class PVPNApplet(QMainWindow):
         self.pollingThread.start()
         return
 
-    def connect_vpn(self, event):
+    def _connect_vpn(self, command):
         self.kill_polling()
-        self.connectThread = ConnectVPN(self)
+        self.connectThread = ConnectVPN(self, command)
         self.connectThread.finished.connect(self.start_polling)
         self.connectThread.start()
+        return
+
+    def connect_fastest(self):
+        self._connect_vpn(VPNCommand.connect_fastest.value)
+        return
+
+    def connect_fastest_p2p(self):
+        self._connect_vpn(VPNCommand.connect_fastest_p2p.value)
+        return
+
+    def connect_fastest_sc(self):
+        self._connect_vpn(VPNCommand.connect_fastest_sc.value)
+        return
+
+    def connect_fastest_cc(self, cc):
+        command = VPNCommand.connect_fastest_cc.value + f' {cc}'
+        self._connect_vpn(command)
+        return
+
+    def connect_fastest_tor(self):
+        self._connect_vpn(VPNCommand.connect_fastest_tor.value)
+        return
+
+    def connect_random(self):
+        self._connect_vpn(VPNCommand.connect_random.value)
         return
 
     def disconnect_vpn(self, event):
@@ -209,6 +303,11 @@ class PVPNApplet(QMainWindow):
         self.statusThread.start()
         return
 
+    def reconnect_vpn(self):
+        self.reconnectThread = ReconnectVPN(self)
+        self.reconnectThread.start()
+        return
+
     # Override closeEvent to intercept the window closing event
     def closeEvent(self, event):
         event.ignore()
@@ -217,6 +316,14 @@ class PVPNApplet(QMainWindow):
 
     def show_notifications(self):
         return self.show_notifications_action.isChecked()
+
+    def update_available_servers(self):
+        utils.pull_server_data()
+        return utils.get_servers()
+
+    @staticmethod
+    def get_available_countries(servers):
+        return sorted(list(set([utils.get_country_name(server['ExitCountry']) for server in servers])))
 
 
 if __name__ == '__main__':
