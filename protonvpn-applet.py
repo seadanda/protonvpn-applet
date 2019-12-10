@@ -80,6 +80,7 @@ class ConnectVPN(QThread):
         QThread.__init__(self)
         self.PApplet = PApplet
         self.command = command
+        print(self.command)
         return
 
     def __del__(self):
@@ -87,8 +88,10 @@ class ConnectVPN(QThread):
         return
 
     def run(self):
+        print('protonvpn-cli-ng currently has an issue getting the status when connected to Tor servers. If you have any doubts, check dnsleaktest.com')
         subprocess.run(self.command.split())
         self.PApplet.status_vpn('dummy')
+
         return
 
 
@@ -135,19 +138,23 @@ class CheckStatus(QThread):
         return
 
     def run(self):
-        result = subprocess.check_output(VPNCommand.status.value.split()).decode(sys.stdout.encoding)
-        result = result.split('\n')
-
-        if 'Disconnected' in result[0]:
-            if self.PApplet.show_notifications():
-                Notify.Notification.new(f'VPN disconnected').show()
-            self.PApplet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-disconnected.png'))
-        elif 'Connected' in result[0]:
-            if self.PApplet.show_notifications():
-                Notify.Notification.new('\n'.join(result)).show()
-            self.PApplet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-connected.png'))
+        result = ''
+        if self.PApplet.is_tor:
+            # rely on polling check and warn
+            print('protonvpn-cli-ng currently has an issue getting the status when connected to Tor servers. If you have any doubts, check dnsleaktest.com')
         else:
-            raise VPNStatusException(f'VPN status could not be parsed: {result}')
+            result = subprocess.check_output(VPNCommand.status.value.split()).decode(sys.stdout.encoding)
+            result = result.split('\n')
+            if 'Disconnected' in result[0]:
+                if self.PApplet.show_notifications():
+                    Notify.Notification.new(f'VPN disconnected').show()
+                self.PApplet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-disconnected.png'))
+            elif 'Connected' in result[0]:
+                if self.PApplet.show_notifications():
+                    Notify.Notification.new('\n'.join(result)).show()
+                self.PApplet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-connected.png'))
+            else:
+                raise VPNStatusException(f'VPN status could not be parsed: {result}')
 
         return
 
@@ -155,6 +162,7 @@ class CheckStatus(QThread):
 class PVPNApplet(QMainWindow):
     tray_icon = None
     polling = True
+    tor_connected = False
 
     # Override the class constructor
     def __init__(self):
@@ -246,6 +254,13 @@ class PVPNApplet(QMainWindow):
         # Polling thread
         self.start_polling()
 
+        return
+
+    def is_tor(self):
+        return self.tor_connected
+
+    def set_tor(self, state: bool):
+        self.tor_connected = state
         return
 
     def is_polling(self):
