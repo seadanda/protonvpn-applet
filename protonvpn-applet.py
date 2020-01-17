@@ -20,15 +20,15 @@ class VPNStatusException(Exception):
 
 
 class VPNCommand(Enum):
-    status = 'sudo protonvpn s'
-    connect_fastest = 'sudo protonvpn c -f'
-    disconnect = 'sudo protonvpn d'
-    connect_random = 'sudo protonvpn c -r'
-    connect_fastest_cc = 'sudo protonvpn c --cc'
-    connect_fastest_p2p = 'sudo protonvpn c --p2p'
-    connect_fastest_sc = 'sudo protonvpn c --sc'
-    connect_fastest_tor = 'sudo protonvpn c --tor'
-    reconnect = 'sudo protonvpn r'
+    status = 'pkexec protonvpn s'
+    connect_fastest = 'pkexec protonvpn c -f'
+    disconnect = 'pkexec protonvpn d'
+    connect_random = 'pkexec protonvpn c -r'
+    connect_fastest_cc = 'pkexec protonvpn c --cc'
+    connect_fastest_p2p = 'pkexec protonvpn c --p2p'
+    connect_fastest_sc = 'pkexec protonvpn c --sc'
+    connect_fastest_tor = 'pkexec protonvpn c --tor'
+    reconnect = 'pkexec protonvpn r'
 
 
 def check_single_instance():
