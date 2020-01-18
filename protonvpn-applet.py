@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/pkexec /usr/bin/python3
 import sys
 import re
 import subprocess
