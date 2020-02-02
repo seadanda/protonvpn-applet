@@ -215,7 +215,8 @@ class PVPNApplet(QMainWindow):
         for country_name in self.get_available_countries(self.servers):
 
             # Get the ISO-3166 Alpha-2 country code
-            country_code = country_codes.country_codes['name_to_cc'][country_name]
+            country_name_to_code = {v: k for k, v in country_codes.country_codes.items()}
+            country_code = country_name_to_code[country_name]
 
             # Dynamically create functions for connecting to each country; each function just passes its respective
             # country code to `self.connect_fastest_cc()`
