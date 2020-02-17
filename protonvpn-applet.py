@@ -58,12 +58,14 @@ class Polling(QThread):
     def run(self):
         while(self.PApplet.is_polling()):
             try:
-                subprocess.check_output('pgrep openvpn'.split()).decode(sys.stdout.encoding)
-                iplink = subprocess.check_output('ip link'.split()).decode(sys.stdout.encoding)
-                if (re.search(r'tun[0-9]:', iplink)):
+                statusmsg = subprocess.check_output(
+                    VPNCommand.status.value.split()).decode(sys.stdout.encoding)
+                if (re.search('Connected', statusmsg)):
                     self.PApplet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-connected.png'))
+                elif (re.search('Disconnected', statusmsg)):
+                    self.PApplet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-disconnected.png'))
                 else:
-                    raise VPNStatusException('Cannot parse `ip link` output.')
+                    raise VPNStatusException('Cannot parse protonvpn-cli status output.')
             except subprocess.CalledProcessError:
                 self.PApplet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-disconnected.png'))
             self.sleep(1)
