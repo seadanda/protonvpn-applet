@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=ProtonVPN-Applet
+GenericName=VPN Applet
+Comment=Community applet for ProtonVPN
+Exec=protonvpn-applet
+Icon=/usr/share/icons/hicolor/16x16/apps/protonvpn-connected.png
+Terminal=false

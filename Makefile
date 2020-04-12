@@ -23,6 +23,8 @@ install: options protonvpn-applet
 	chmod 644 $(DESTDIR)$(ICONDIR)/protonvpn-connected.png
 	cp -f icons/16x16/protonvpn-disconnected.png $(DESTDIR)$(ICONDIR)
 	chmod 644 $(DESTDIR)$(ICONDIR)/protonvpn-disconnected.png
+	cp -f protonvpn-applet.desktop /usr/share/applications
+	chmod 644 /usr/share/applications/protonvpn-applet.desktop 
 
 clean:
 	rm -f protonvpn-applet
@@ -31,3 +33,4 @@ uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/protonvpn-applet
 	rm -f $(DESTDIR)$(ICONDIR)/protonvpn-connected.png
 	rm -f $(DESTDIR)$(ICONDIR)/protonvpn-disconnected.png
+	rm -f /usr/share/applications/protonvpn-applet.desktop 
