@@ -12,6 +12,7 @@ from PyQt5.QtCore import QSize, QThread, pyqtSignal
 from PyQt5.QtGui import QIcon
 
 from protonvpn_cli import utils, country_codes
+from protonvpn_cli.utils import is_connected
 
 
 PROTONVPN_APPLET_VERSION = 0.1
@@ -58,7 +59,7 @@ class Status(Enum):
 
 def check_status(applet, previous_status=None, log=False):
     """
-    Checks the VPN status with `protonvpn status` command.
+    Checks the VPN status with is_connected() from utils
     """
     result = subprocess.check_output(VPNCommand.status.value.split()).decode(sys.stdout.encoding)
 
@@ -67,18 +68,16 @@ def check_status(applet, previous_status=None, log=False):
 
     prev_not = lambda s: previous_status is None or previous_status != s
 
-    if Status.disconnected.value in result:
-        if applet.show_notifications() and prev_not(Status.disconnected):
-            Notify.Notification.new(f'VPN disconnected').show()
-        applet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-disconnected.png'))
-        applet.previous_status = Status.disconnected
-    elif Status.connected.value in result:
+    if is_connected():
         if applet.show_notifications() and prev_not(Status.connected):
             Notify.Notification.new(result).show()
         applet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-connected.png'))
         applet.previous_status = Status.connected
     else:
-        raise VPNStatusException(f'VPN status could not be parsed: {result}')
+        if applet.show_notifications() and prev_not(Status.disconnected):
+            Notify.Notification.new(f'VPN disconnected').show()
+        applet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-disconnected.png'))
+        applet.previous_status = Status.disconnected
 
 
 class Polling(QThread):
@@ -91,14 +90,10 @@ class Polling(QThread):
 
     def run(self):
         while(self.PApplet.is_polling()):
-            try:
-                check_status(self.PApplet, self.PApplet.previous_status)
-            except VPNStatusException as err:
-                if self.PApplet.show_notifications():
-                    Notify.Notification.new(str(err)).show()
-                self.PApplet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-disconnected.png'))
-                self.PApplet.previous_status = Status.disconnected
-            except subprocess.CalledProcessError:
+            if is_connected():
+                self.PApplet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-connected.png'))
+                self.PApplet.previous_status = Status.connected
+            else:
                 self.PApplet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-disconnected.png'))
                 self.PApplet.previous_status = Status.disconnected
             self.sleep(1)
