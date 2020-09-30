@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import sys
-import re
 import subprocess
 import functools
 from enum import Enum
@@ -277,12 +276,6 @@ class PVPNApplet(QMainWindow):
 
         # Polling thread
         self.start_polling()
-
-    def is_tor(self):
-        return self.tor_connected
-
-    def set_tor(self, state: bool):
-        self.tor_connected = state
 
     def is_polling(self):
         return self.polling
