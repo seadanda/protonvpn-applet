@@ -57,52 +57,32 @@ class Status(Enum):
     disconnected = 'Disconnected'
 
 
-def check_status(applet, previous_status=None, log=False):
-    """
-    Checks the VPN status with is_connected() from utils
-    """
-    result = subprocess.check_output(VPNCommand.status.value.split()).decode(sys.stdout.encoding)
-
-    if log:
-        print(result)
-
-    prev_not = lambda s: previous_status is None or previous_status != s
-
-    if is_connected():
-        if applet.show_notifications() and prev_not(Status.connected):
-            Notify.Notification.new(result).show()
-        applet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-connected.png'))
-        applet.previous_status = Status.connected
-    else:
-        if applet.show_notifications() and prev_not(Status.disconnected):
-            Notify.Notification.new(f'VPN disconnected').show()
-        applet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-disconnected.png'))
-        applet.previous_status = Status.disconnected
-
-
 class Polling(QThread):
-    def __init__(self, PApplet):
+    def __init__(self, applet):
         QThread.__init__(self)
-        self.PApplet = PApplet
+        self.applet = applet
 
     def __del__(self):
         self.wait()
 
     def run(self):
-        while(self.PApplet.is_polling()):
+        while(self.applet.is_polling()):
             if is_connected():
-                self.PApplet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-connected.png'))
-                self.PApplet.previous_status = Status.connected
+                self.applet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-connected.png'))
+                self.applet.previous_status = Status.connected
             else:
-                self.PApplet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-disconnected.png'))
-                self.PApplet.previous_status = Status.disconnected
+                # notify on disconnection
+                if self.applet.show_notifications() and self.applet.previous_status == Status.connected:
+                    CheckStatus(self).start()
+                self.applet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-disconnected.png'))
+                self.applet.previous_status = Status.disconnected
             self.sleep(1)
 
 
 class ConnectVPN(QThread):
-    def __init__(self, PApplet, command):
+    def __init__(self, applet, command):
         QThread.__init__(self)
-        self.PApplet = PApplet
+        self.applet = applet
         self.command = command
         print(self.command)
 
@@ -111,45 +91,50 @@ class ConnectVPN(QThread):
 
     def run(self):
         subprocess.run(self.command.split())
-        self.PApplet.status_vpn('dummy')
+        self.applet.status_vpn('dummy')
 
 
 class DisconnectVPN(QThread):
-    def __init__(self, PApplet):
+    def __init__(self, applet):
         QThread.__init__(self)
-        self.PApplet = PApplet
+        self.applet = applet
 
     def __del__(self):
         self.wait()
 
     def run(self):
         subprocess.run(VPNCommand.disconnect.value.split())
-        self.PApplet.status_vpn('dummy')
+        self.applet.status_vpn('dummy')
 
 
 class ReconnectVPN(QThread):
-    def __init__(self, PApplet):
+    def __init__(self, applet):
         QThread.__init__(self)
-        self.PApplet = PApplet
+        self.applet = applet
 
     def __del__(self):
         self.wait()
 
     def run(self):
         subprocess.run(VPNCommand.reconnect.value.split())
-        self.PApplet.status_vpn('dummy')
+        self.applet.status_vpn('dummy')
 
 
 class CheckStatus(QThread):
-    def __init__(self, PApplet):
+    def __init__(self, applet):
         QThread.__init__(self)
-        self.PApplet = PApplet
+        self.applet = applet
 
     def __del__(self):
         self.wait()
 
     def run(self):
-        return check_status(self.PApplet, log=True)
+        """
+        Report protonVPN status
+        """
+        result = subprocess.check_output(VPNCommand.status.value.split()).decode(sys.stdout.encoding)
+
+        Notify.Notification.new(result).show()
 
 
 class CheckProtonVPNVersion(QThread):
