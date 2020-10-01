@@ -19,10 +19,13 @@ PROTONVPN_APPLET_VERSION = 0.1
 
 
 class VPNStatusException(Exception):
-    pass
+    """General exception to throw when anything goes wrong
+    """
 
 
 class VPNCommand(Enum):
+    """Commands to run the CLI
+    """
     status = 'protonvpn s'
     connect_fastest = 'protonvpn c -f'
     disconnect = 'protonvpn d'
@@ -36,14 +39,15 @@ class VPNCommand(Enum):
 
 
 def check_single_instance():
-
+    """Use pgrep to check if protonvpn-applet is already running
+    """
     pid = None
 
     try:
-        pid = subprocess.check_output('pgrep protonvpn-applet'.split()).decode(sys.stdout.encoding)
+        pid = subprocess.run('pgrep protonvpn-applet'.split(), check=True, capture_output=True)
     except subprocess.CalledProcessError:
         try:
-            pid = subprocess.check_output('pgrep protonvpn-applet.py'.split()).decode(sys.stdout.encoding)
+            pid = subprocess.run('pgrep protonvpn-applet.py'.split(), check=True, capture_output=True)
         except subprocess.CalledProcessError:
             pass
 
@@ -53,11 +57,15 @@ def check_single_instance():
 
 
 class Status(Enum):
+    """Enum to keep track of the previous connection state
+    """
     connected = 'Connected'
     disconnected = 'Disconnected'
 
 
 class Polling(QThread):
+    """Thread to check the VPN state every second and notifies on disconnection
+    """
     def __init__(self, applet):
         QThread.__init__(self)
         self.applet = applet
@@ -66,7 +74,7 @@ class Polling(QThread):
         self.wait()
 
     def run(self):
-        while(self.applet.is_polling()):
+        while self.applet.is_polling():
             if is_connected():
                 self.applet.tray_icon.setIcon(QIcon('icons/16x16/protonvpn-connected.png'))
                 self.applet.previous_status = Status.connected
@@ -80,6 +88,8 @@ class Polling(QThread):
 
 
 class ConnectVPN(QThread):
+    """Thread to connect using the specified profile
+    """
     def __init__(self, applet, command):
         QThread.__init__(self)
         self.applet = applet
@@ -90,11 +100,13 @@ class ConnectVPN(QThread):
         self.wait()
 
     def run(self):
-        subprocess.run([self.applet.auth] + self.command.split())
-        self.applet.status_vpn('dummy')
+        subprocess.run([self.applet.auth] + self.command.split(), check=False)
+        self.applet.status_vpn()
 
 
 class DisconnectVPN(QThread):
+    """Thread to disconnect the VPN
+    """
     def __init__(self, applet):
         QThread.__init__(self)
         self.applet = applet
@@ -103,11 +115,13 @@ class DisconnectVPN(QThread):
         self.wait()
 
     def run(self):
-        subprocess.run([self.applet.auth] + VPNCommand.disconnect.value.split())
-        self.applet.status_vpn('dummy')
+        subprocess.run([self.applet.auth] + VPNCommand.disconnect.value.split(), check=False)
+        self.applet.status_vpn()
 
 
 class ReconnectVPN(QThread):
+    """Thread to connect using previously used profile
+    """
     def __init__(self, applet):
         QThread.__init__(self)
         self.applet = applet
@@ -116,11 +130,13 @@ class ReconnectVPN(QThread):
         self.wait()
 
     def run(self):
-        subprocess.run([self.applet.auth] + VPNCommand.reconnect.value.split())
-        self.applet.status_vpn('dummy')
+        subprocess.run([self.applet.auth] + VPNCommand.reconnect.value.split(), check=False)
+        self.applet.status_vpn()
 
 
 class CheckStatus(QThread):
+    """Thread to report ProtonVPN status
+    """
     def __init__(self, applet):
         QThread.__init__(self)
         self.applet = applet
@@ -129,16 +145,13 @@ class CheckStatus(QThread):
         self.wait()
 
     def run(self):
-        """
-        Report protonVPN status
-        """
-        result = subprocess.check_output(VPNCommand.status.value.split()).decode(sys.stdout.encoding)
-
-        Notify.Notification.new(result).show()
+        result = subprocess.run(VPNCommand.status.value.split(), check=False, capture_output=True)
+        Notify.Notification.new(result.stdout.decode()).show()
 
 
 class CheckProtonVPNVersion(QThread):
-
+    """Thread to check version
+    """
     protonvpn_version_ready = pyqtSignal(str)
 
     def __init__(self, parent=None):
@@ -155,7 +168,8 @@ class CheckProtonVPNVersion(QThread):
 
 
 class PVPNApplet(QMainWindow):
-
+    """Main applet body
+    """
     tray_icon = None
     polling = True
     previous_status = None
@@ -164,8 +178,7 @@ class PVPNApplet(QMainWindow):
 
     # Override the class constructor
     def __init__(self):
-
-        QMainWindow.__init__(self)
+        super(PVPNApplet, self).__init__()
 
         self.setMinimumSize(QSize(480, 80))             # Set sizes
         self.setWindowTitle('ProtonVPN Qt')             # Set a title
@@ -268,14 +281,14 @@ class PVPNApplet(QMainWindow):
 
     def start_polling(self):
         self.polling = True
-        self.pollingThread = Polling(self)
-        self.pollingThread.start()
+        self.polling_thread = Polling(self)
+        self.polling_thread.start()
 
     def _connect_vpn(self, command):
         self.kill_polling()
-        self.connectThread = ConnectVPN(self, command)
-        self.connectThread.finished.connect(self.start_polling)
-        self.connectThread.start()
+        connect_thread = ConnectVPN(self, command)
+        connect_thread.finished.connect(self.start_polling)
+        connect_thread.start()
 
     def connect_fastest(self):
         self._connect_vpn(VPNCommand.connect_fastest.value)
@@ -296,17 +309,17 @@ class PVPNApplet(QMainWindow):
     def connect_random(self):
         self._connect_vpn(VPNCommand.connect_random.value)
 
-    def disconnect_vpn(self, event):
-        self.disconnectThread = DisconnectVPN(self)
-        self.disconnectThread.start()
+    def disconnect_vpn(self):
+        disconnect_thread = DisconnectVPN(self)
+        disconnect_thread.start()
 
-    def status_vpn(self, event):
-        self.statusThread = CheckStatus(self)
-        self.statusThread.start()
+    def status_vpn(self):
+        status_thread = CheckStatus(self)
+        status_thread.start()
 
     def reconnect_vpn(self):
-        self.reconnectThread = ReconnectVPN(self)
-        self.reconnectThread.start()
+        reconnect_thread = ReconnectVPN(self)
+        reconnect_thread.start()
 
     # Override closeEvent to intercept the window closing event
     def closeEvent(self, event):
@@ -320,7 +333,7 @@ class PVPNApplet(QMainWindow):
         """Show the protonvpn-applet version.
         """
 
-        name = '© 2019 Dónal Murray'
+        name = '© 2020 Dónal Murray'
         email = 'dmurray654@gmail.com'
         github = 'https://github.com/seadanda/protonvpn-applet'
 
@@ -337,12 +350,13 @@ class PVPNApplet(QMainWindow):
         """Start the CheckProtonVPNVersion thread; when it gets the version, it will call `self.show_protonvpn_version`
         """
         print('called get_protonvpn_version')
-        self.check_protonvpn_version_thread = CheckProtonVPNVersion(self)
-        self.check_protonvpn_version_thread.protonvpn_version_ready.connect(self.show_protonvpn_version)
-        self.check_protonvpn_version_thread.start()
+        check_protonvpn_version_thread = CheckProtonVPNVersion(self)
+        check_protonvpn_version_thread.protonvpn_version_ready.connect(self.show_protonvpn_version)
+        check_protonvpn_version_thread.start()
 
     def show_protonvpn_version(self, version):
-        """Show the ProtonVPN version in a QMessageBox.
+        """
+        Show the ProtonVPN version in a QMessageBox.
 
         Parameters
         ----------
@@ -358,7 +372,7 @@ class PVPNApplet(QMainWindow):
 
     @staticmethod
     def get_available_countries(servers):
-        return sorted(list(set([utils.get_country_name(server['ExitCountry']) for server in servers])))
+        return sorted(list({utils.get_country_name(server['ExitCountry']) for server in servers}))
 
 
 if __name__ == '__main__':
