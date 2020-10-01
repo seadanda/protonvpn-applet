@@ -179,11 +179,6 @@ class PVPNApplet(QMainWindow):
     # Override the class constructor
     def __init__(self):
         super(PVPNApplet, self).__init__()
-
-        self.setMinimumSize(QSize(480, 80))             # Set sizes
-        self.setWindowTitle('ProtonVPN Qt')             # Set a title
-        central_widget = QWidget(self)                  # Create a central widget
-        self.setCentralWidget(central_widget)           # Set the central widget
         self.country_codes = country_codes              # Keep a list of country codes
 
         # Init QSystemTrayIcon
