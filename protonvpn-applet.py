@@ -23,16 +23,16 @@ class VPNStatusException(Exception):
 
 
 class VPNCommand(Enum):
-    status = 'sudo protonvpn s'
-    connect_fastest = 'sudo protonvpn c -f'
-    disconnect = 'sudo protonvpn d'
-    version = 'sudo protonvpn -v'
-    connect_random = 'sudo protonvpn c -r'
-    connect_fastest_cc = 'sudo protonvpn c --cc'
-    connect_fastest_p2p = 'sudo protonvpn c --p2p'
-    connect_fastest_sc = 'sudo protonvpn c --sc'
-    connect_fastest_tor = 'sudo protonvpn c --tor'
-    reconnect = 'sudo protonvpn r'
+    status = 'protonvpn s'
+    connect_fastest = 'protonvpn c -f'
+    disconnect = 'protonvpn d'
+    version = 'protonvpn -v'
+    connect_random = 'protonvpn c -r'
+    connect_fastest_cc = 'protonvpn c --cc'
+    connect_fastest_p2p = 'protonvpn c --p2p'
+    connect_fastest_sc = 'protonvpn c --sc'
+    connect_fastest_tor = 'protonvpn c --tor'
+    reconnect = 'protonvpn r'
 
 
 def check_single_instance():
@@ -90,7 +90,7 @@ class ConnectVPN(QThread):
         self.wait()
 
     def run(self):
-        subprocess.run(self.command.split())
+        subprocess.run([self.applet.auth] + self.command.split())
         self.applet.status_vpn('dummy')
 
 
@@ -103,7 +103,7 @@ class DisconnectVPN(QThread):
         self.wait()
 
     def run(self):
-        subprocess.run(VPNCommand.disconnect.value.split())
+        subprocess.run([self.applet.auth] + VPNCommand.disconnect.value.split())
         self.applet.status_vpn('dummy')
 
 
@@ -116,7 +116,7 @@ class ReconnectVPN(QThread):
         self.wait()
 
     def run(self):
-        subprocess.run(VPNCommand.reconnect.value.split())
+        subprocess.run([self.applet.auth] + VPNCommand.reconnect.value.split())
         self.applet.status_vpn('dummy')
 
 
@@ -159,6 +159,8 @@ class PVPNApplet(QMainWindow):
     tray_icon = None
     polling = True
     previous_status = None
+    #auth = 'pkexec'
+    auth = 'sudo'
 
     # Override the class constructor
     def __init__(self):

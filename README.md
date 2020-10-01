@@ -6,8 +6,13 @@ I like systray icons and nothing existed for ProtonVPN so I made one. Warning: l
 ## Dependencies
 - python3
 - libnotify
+- protonvpn-linux-cli
+
+and either
 - sudo (with [passwordless sudo](https://wiki.archlinux.org/index.php/Sudo#Example_entries))
-- protonvpn-cli-ng
+OR
+- polkit
+- A [graphical authentication agent](https://wiki.archlinux.org/index.php/Polkit#Authentication_agents)
 
 Python packages:
 - pre-commit
