@@ -15,7 +15,7 @@ from protonvpn_cli import utils, country_codes
 from protonvpn_cli.utils import is_connected
 
 
-PROTONVPN_APPLET_VERSION = 0.1
+PROTONVPN_APPLET_VERSION = "0.1.7"
 
 
 class VPNStatusException(Exception):
